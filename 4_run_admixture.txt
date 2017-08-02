@@ -1,0 +1,23 @@
+################################################################################################
+#
+#           4. Population structure plot                    
+#
+#
+################################################################################################
+
+# Prepare VCF file for running the program ADMIXTURE (population structure analysis)
+# Thin VCF file to attempt to account for linkage disequilibrium (no sites within 5000 basepairs of one another)
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05.recode.vcf --out merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000 --thin 5000 --recode --recode-INFO-all
+
+# Convert to plink format (ADMIXTURE takes plink files as input)
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000 --plink --out merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plink
+
+# Recode the plink file so that genotypes are in 0,1,2 format (makes it compatible with ADMIXTURE)
+plink --file merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plink --recode12 --noweb --out merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plinkrecode12
+
+# Run the ADMIXTURE cross-validation protocol, select the model with the lowest CV error as the best model
+
+for K in 1 2 3 4 5 6; \
+do admixture -s INSERT_RANDOM_NUMBER_HERE --cv merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plinkrecode12.ped $K | tee log${K}.out; done
+
+grep -h CV log*.out

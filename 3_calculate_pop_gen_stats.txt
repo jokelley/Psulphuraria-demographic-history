@@ -1,0 +1,31 @@
+################################################################################################
+#
+#           3. Calculating population genetic statistics                      
+#
+#
+################################################################################################
+
+# Calculate FST between populations using vcftools
+# Need to calculate FST between all possible pairs (3 combinations)
+# gloria_samples.txt contains a list of sample IDs for gloria individuals 
+# banos_samples.txt contains a list of sample IDs for banos individuals
+# esperanza_samples.txt contains a list of sample IDs for esperanza individuals
+
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --weir-fst-pop gloria_samples.txt --weir-fst-pop banos_samples.txt --out gloria_and_banos_fst
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --weir-fst-pop gloria_samples.txt --weir-fst-pop esperanza_samples.txt --out gloria_and_esperanza_fst
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --weir-fst-pop banos_samples.txt --weir-fst-pop esperanza_samples.txt --out banos_and_esperanza_fst
+
+# Calculate Transition/Transversion ratio
+
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --TsTv-summary --out transition_transversion_ratio
+
+# Separate merged vcf file into separate files per population to calculate inbreeding coefficient
+
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --keep gloria_samples.txt --recode --recode-INFO-all --out gloria_snps_minDP8_maxmiss0.9_minQ30_hwe0.05
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --keep banos_samples.txt --recode --recode-INFO-all --out banos_snps_minDP8_maxmiss0.9_minQ30_hwe0.05
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --keep esperanza_samples.txt --recode --recode-INFO-all --out esperanza_snps_minDP8_maxmiss0.9_minQ30_hwe0.05
+
+# Calculate inbreeding coefficient for each population
+vcftools --vcf gloria_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --het --out gloria_inbreeding
+vcftools --vcf banos_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --het --out banos_inbreeding
+vcftools --vcf esperanza_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --het --out esperanza_inbreeding

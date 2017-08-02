@@ -1,0 +1,23 @@
+################################################################################################
+#
+#           7. Preparing to use dadi for demographic modeling                   
+#
+#
+################################################################################################
+
+# Use dadi for demographic modeling
+# Need to convert VCF to dadi format
+# We used a perl script from the dadi forum named "convert_vcf_to_dadi_input.pl"
+# We need a file that delineates which samples are in which populations (populations.txt)
+# In this file, the first column is the sample name and the second column is the population name
+# Here is an example row from the file: Sample_241	Esperanza
+
+perl <path to reference genome> merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf populations.txt
+
+# Change the name of the output to something more useful (e.g. poecilia_dadi.data)
+
+# Run dadi using demographic model (splitwithmig.py)
+# Write separate script (run_dadi.py) because the script is in Python
+# The script is in a separate file, but here is how to invoke it
+
+python run_dadi.py

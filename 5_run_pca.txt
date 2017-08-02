@@ -1,0 +1,27 @@
+################################################################################################
+#
+#           5. Principle components analysis (PCA)                    
+#
+#
+################################################################################################
+
+# Convert PED file used for ADMIXTURE analysis to a BED file (for whatever reason this works better for me; both PED and BED are supposed to be compatible though)
+# Even though the output and input look the same, the output will have a .bed extension, so it will not overwrite the input
+# This should create files with these extensions: .bed, .bim, .fam
+
+plink --file merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plinkrecode12 --make-bed --noweb --out merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plinkrecode12
+
+# Use smartpca to run a principle components analysis (PCA)
+# Create a separate parameter file that looks like this (next 5 lines, remove #s): 
+# genotypename: merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plinkrecode12.bed
+# snpname:      merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plinkrecode12.bim
+# indivname:    merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05_thin5000plinkrecode12.fam
+# evecoutname:  pca_results
+# evaloutname:  pca_results
+
+# Run smartpca, output will be in the pca_results file
+# parameters_smartpca.txt is the parameter file from above
+
+smartpca -p parameters_smartpca.txt
+
+# Results can be plotted in your favorite plotting software or program

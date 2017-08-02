@@ -1,0 +1,139 @@
+################################################################################################
+#
+#           2. Calling/Filtering SNPs                      
+#
+#
+################################################################################################
+
+# Use GATK to call SNPs on a per population basis
+# Create sequence dictionary for reference prior to calling SNPs
+
+java -jar picard.jar CreateSequenceDictionary \ 
+      R=<path to reference> \
+      O=<path to reference without .fa extension>.dict
+
+# Use UnifiedGenotyper in GATK to call SNPs per population
+# Use EMIT_ALL_SITES to show all sites in the resulting vcf files (facilitates merging of vcf files later)
+	  
+java -Xmx2048m -jar GenomeAnalysisTK.jar \
+        -T UnifiedGenotyper \
+        -R <path to reference> \
+        -o gloria.vcf.gz \
+	--output_mode EMIT_ALL_SITES \
+	-I Sample_91.F.bam \
+	-I Sample_92.F.bam \
+	-I Sample_95.F.bam \
+	-I Sample_96.F.bam \
+	-I Sample_97.F.bam \
+	-I Sample_99.F.bam \
+	-I Sample_104.F.bam \
+	-I Sample_106.F.bam \
+	-I Sample_107.F.bam \
+	-I Sample_109.F.bam
+	
+java -Xmx2048m -jar GenomeAnalysisTK.jar \
+        -T UnifiedGenotyper \
+        -R <path to reference> \
+        -o banos.vcf.gz \
+	--output_mode EMIT_ALL_SITES \
+	-I Sample_121.F.bam \
+	-I Sample_122.F.bam \
+	-I Sample_123.F.bam \
+	-I Sample_129.F.bam \
+	-I Sample_132.F.bam \
+	-I Sample_133.F.bam \
+	-I Sample_134.F.bam \
+	-I Sample_142.F.bam \
+	-I Sample_143.F.bam \
+	-I Sample_147.F.bam
+
+java -Xmx2048m -jar GenomeAnalysisTK.jar \
+        -T UnifiedGenotyper \
+        -R <path to reference> \
+        -o esperanza.vcf.gz \
+	--output_mode EMIT_ALL_SITES \
+	-I Sample_241.F.bam \
+	-I Sample_242.F.bam \
+	-I Sample_244.F.bam \
+	-I Sample_245.F.bam \
+	-I Sample_247.F.bam \
+	-I Sample_251.F.bam \
+	-I Sample_258.F.bam \
+	-I Sample_260.F.bam \
+	-I Sample_266.F.bam \
+	-I Sample_268.F.bam
+
+# Use vcf-merge (Perl module from vcftools) to merge population vcf files into one vcf
+# Move into directory that contains vcftools Perl modules
+# Use bgzip to zip the merged vcf file, use tabix to index the merged vcf file
+
+./vcf-merge gloria.vcf.gz  banos.vcf.gz esperanza.vcf.gz | bgzip -c > merged.vcf.gz
+tabix merged.vcf.gz
+
+# Filter merged vcf file with GATK
+# Use SelectVariants to pull out biallelic SNPs
+
+java -jar GenomeAnalysisTK.jar \
+    -T SelectVariants \
+    -R <path to reference> \
+    -V merged.vcf.gz \
+    -selectType SNP \
+    -restrictAllelesTo BIALLELIC \
+    -o merged_just_biallelic_snps.vcf
+
+# Use VariantFiltration to apply standard GATK hard filters
+
+java -jar GenomeAnalysisTK.jar \
+    -T VariantFiltration \
+    -R <path to reference> \
+    -V merged_just_biallelic_snps.vcf \
+    --filterExpression "QD < 2.0 || FS > 60.0 || MQ < 40.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0" \
+    --filterName "my_snp_filter" \
+    -o filter_applied_biallelic_snps.vcf
+
+# Use SelectVariants to exclude sites that didn't pass the hard filters
+
+java -jar GenomeAnalysisTK.jar \
+    -T SelectVariants \
+    -R <path to reference> \
+    -V filter_applied_biallelic_snps.vcf \
+    --excludeFiltered \
+    -o filter_excluded_biallelic_snps.vcf
+
+# Use vcftools to further filter the SNPs. --minDP 8 only keeps genotypes supported by at least 8x coverage. --max-missing 0.9 only keeps sites where 90% of individuals have an inferred genotype.
+# --minQ 30 only keeps genotypes with a quality of at least 30
+# Remove mitochondrial markers with --not-chr
+# Vcftools adds a suffix to the end of the out file automatically (".recode.vcf")
+
+vcftools --vcf filter_excluded_biallelic_snps.vcf --minDP 8 --max-missing 0.9 --recode --recode-INFO-all --minQ 30 --not-chr <mitochondrial scaffold name> --out merged_snps_minDP8_maxmiss0.9_minQ30
+
+# Use --maf 0.019 to create a separate vcf where singletons are filtered out. This filters out sites with a minor allele frequency of 0.019 or fewer (all singletons in this case)
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf --maf 0.019 --recode --recode-INFO-all --out merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019
+
+# Use bgzip to zip the resulting vcf files, use tabix to index them
+bgzip -c merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf > merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf.gz
+bgzip -c merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019.recode.vcf > merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019.recode.vcf.gz
+tabix merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf.gz
+tabix merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019.recode.vcf.gz
+
+# Separate into separate vcf files per population so that we can filter out sites in HWE
+# gloria_samples.txt contains a list of sample IDs for gloria individuals 
+# banos_samples.txt contains a list of sample IDs for banos individuals
+# esperanza_samples.txt contains a list of sample IDs for esperanza individuals
+
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf.gz --keep gloria_samples.txt --recode --recode-INFO-all --out gloria_snps_minDP8_maxmiss0.9_minQ30
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf.gz --keep banos_samples.txt --recode --recode-INFO-all --out banos_snps_minDP8_maxmiss0.9_minQ30
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf.gz --keep esperanza_samples.txt --recode --recode-INFO-all --out esperanza_snps_minDP8_maxmiss0.9_minQ30
+
+# Calculate probability that sites are in HWE using vcftools (using --hardy)
+
+vcftools --vcf gloria_snps_minDP8_maxmiss0.9_minQ30.recode.vcf --hardy --out gloria_HWE
+vcftools --vcf banos_snps_minDP8_maxmiss0.9_minQ30.recode.vcf --hardy --out banos_HWE
+vcftools --vcf esperanza_snps_minDP8_maxmiss0.9_minQ30.recode.vcf --hardy --out esperanza_HWE
+
+# Use HWE output files to compile a list of sites that are not in HWE in at least one population (p less than or equal to 0.05).
+# This list will have two columns. Column one is the scaffold and column two is the position on the scaffold.
+# Filter these sites out of the merged vcf files using vcftools
+
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30.recode.vcf.gz --exclude-positions sites_out_of_hwe.txt --recode --recode-INFO-all --out merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05
+vcftools --gzvcf merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019.recode.vcf.gz --exclude-positions sites_out_of_hwe.txt --recode --recode-INFO-all --out merged_snps_minDP8_maxmiss0.9_minQ30_maf0.019_hwe0.05

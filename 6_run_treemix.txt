@@ -1,0 +1,45 @@
+################################################################################################
+#
+#           6. TreeMix                   
+#
+#
+################################################################################################
+
+# Use the data to plot a maximum likelihood, bifurcating tree with TreeMix
+# For TreeMix, we want to keep singletons, so we will go back to our VCF file that contained singletons and filter it down from there
+# As we did for ADMIXTURE, we will try to account for linkage disequilibrium using the --thin option (no sites within 5000 basepairs of one another)
+
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05.recode.vcf --out merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05_thin5000 --thin 5000 --recode --recode-INFO-all
+
+# Convert VCF to plink format (compatible with a TreeMix script which makes conversion to TreeMix format easier)
+
+vcftools --vcf merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05_thin5000.recode.vcf --plink --out merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05_thin5000_plink
+
+# Need to create a file that shows allele frequency on a per population basis for TreeMix
+# Plink has an option for creating this file (--freq)
+# Need to provide plink with a file that tells it which samples are in which population
+# This file has 3 columns: columns 1 and 2 are the sample name (same for each column) and column 3 is the population name
+# Here is a sample row from that file: Sample_91       Sample_91       Gloria
+# I will call this file "populations.clust"
+
+plink --noweb --file merged_snps_minDP8_maxmiss0.9_minQ30_hwe0.05_thin5000_plink --freq --within populations.clust --out frequency_file
+
+# For the next part, the frequency_file needs to be compressed
+
+gzip frequency_file.frq.strat
+
+# Use a script found in the TreeMix distribution to convert plink files to TreeMix format (the script is called plink2treemix.py)
+# data_in_treemix_format is the output
+
+plink2treemix.py frequency_file.frq.strat.gz data_in_treemix_format
+
+# Use the output file to run treemix
+# It can be run with or without migration
+# This is an example without migration
+
+treemix -i data_in_treemix_format.gz -o treemix_nomig.gz
+
+# The -m option can be used to add migration events
+# Here is an example with one migration event
+
+treemix -i data_in_treemix_format.gz -m 1 -o treemix_1mig.gz
